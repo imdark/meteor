@@ -140,7 +140,7 @@ Blaze.View.prototype.onViewDestroyed = function (cb) {
 /// callback.  Autoruns that update the DOM should be started
 /// from either onViewCreated (guarded against the absence of
 /// view._domrange), or onViewReady.
-Blaze.View.prototype.autorun = function (f, _inViewScope) {
+Blaze.View.prototype.autorun = function (f, _inViewScope, displayName) {
   var self = this;
 
   // The restrictions on when View#autorun can be called are in order
@@ -174,18 +174,27 @@ Blaze.View.prototype.autorun = function (f, _inViewScope) {
     throw new Error("Can't call View#autorun from a Tracker Computation; try calling it from the created or rendered callback");
   }
 
-  var templateInstanceFunc = Blaze.Template._currentTemplateInstanceFunc;
+  // Use a local dictionary for locals to allocate them on heap. Helps to avoid
+  // the stack overflow.
+  var locals = {};
+  locals.templateInstanceFunc = Blaze.Template._currentTemplateInstanceFunc;
 
-  var c = Tracker.autorun(function viewAutorun(c) {
+  locals.f = function viewAutorun(c) {
     return Blaze._withCurrentView(_inViewScope || self, function () {
-      return Blaze.Template._withTemplateInstanceFunc(templateInstanceFunc, function () {
+      return Blaze.Template._withTemplateInstanceFunc(locals.templateInstanceFunc, function () {
         return f.call(self, c);
       });
     });
-  });
-  self.onViewDestroyed(function () { c.stop(); });
+  };
 
-  return c;
+  // give the autorun function a better name for debugging and profiling
+  locals.f.displayName =
+    (self.name || 'anonymous') + (displayName || 'anonymous');
+  locals.c = Tracker.autorun(locals.f);
+
+  self.onViewDestroyed(function () { locals.c.stop(); });
+
+  return locals.c;
 };
 
 Blaze.View.prototype._errorIfShouldntCallSubscribe = function () {
@@ -305,7 +314,7 @@ Blaze._materializeView = function (view, parentView) {
       Tracker.onInvalidate(function () {
         domrange.destroyMembers();
       });
-    });
+    }, undefined, ':materialize');
 
     var teardownHook = null;
 
