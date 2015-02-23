@@ -1,6 +1,6 @@
-//////////////////////////////////////////////////
+/////////////////////////////////////////////////////
 // Package docs at http://docs.meteor.com/#tracker //
-//////////////////////////////////////////////////
+/////////////////////////////////////////////////////
 
 /**
  * @namespace Tracker
@@ -25,6 +25,9 @@ Tracker.active = false;
  * @type {Tracker.Computation}
  */
 Tracker.currentComputation = null;
+
+// References to all computations created within the Tracker by id.
+Tracker._computations = {};
 
 var setCurrentComputation = function (c) {
   Tracker.currentComputation = c;
@@ -176,6 +179,9 @@ Tracker.Computation = function (f, parent) {
   self._func = f;
   self._recomputing = false;
 
+  // Register the computation within the global Tracker.
+  Tracker._computations[self._id] = self;
+
   var errored = true;
   try {
     self._compute();
@@ -248,6 +254,8 @@ Tracker.Computation.prototype.stop = function () {
   if (! this.stopped) {
     this.stopped = true;
     this.invalidate();
+    // Unregister from global Tracker.
+    delete Tracker._computations[this._id];
   }
 };
 
