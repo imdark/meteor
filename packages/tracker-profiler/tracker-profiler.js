@@ -15,8 +15,7 @@ TrackerProfiler.start = function () {
       aveTime: 0,
       totalTime: 0,
       recomputations: 0,
-      funcName: c._func.displayName || c._func.name,
-      funcStr: c._func.toString()
+      funcName: c._func.displayName || c._func.name
     };
 
     oldFuncs[id] = c._func;
@@ -56,8 +55,10 @@ TrackerProfiler.stop = function () {
   oldFuncs = {};
   profileData = {};
 
-  return _.map(mapping, function (data, id) {
+  var filteredRecords = _.filter(_.map(mapping, function (data, id) {
     return _.extend(data, { _id: id });
-  });
+  }), function (data) { return !! data.recomputations; });
+
+  return _.sortBy(filteredRecords, 'totalTime').reverse();
 };
 
